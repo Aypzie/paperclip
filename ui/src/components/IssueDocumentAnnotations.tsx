@@ -13,7 +13,7 @@ import type { CompanyUserProfile } from "@/lib/company-members";
 
 const DESKTOP_ANNOTATION_PANEL_WIDTH = 360;
 const DESKTOP_ANNOTATION_PANEL_MIN_WIDTH = 280;
-const DESKTOP_ANNOTATION_PANEL_GAP = 12;
+const DESKTOP_ANNOTATION_PANEL_GAP = 24;
 const DESKTOP_ANNOTATION_PANEL_VIEWPORT_MARGIN = 16;
 
 export interface IssueDocumentAnnotationsProps {

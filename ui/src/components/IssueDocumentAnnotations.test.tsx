@@ -342,6 +342,61 @@ describe("IssueDocumentAnnotations", () => {
     }
   });
 
+  it("offsets the desktop annotation panel from the document with a left margin when there is room", async () => {
+    mockAnnotationsApi.list.mockResolvedValue([makeThread()]);
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    const rectFor = (left: number, top: number, right: number, bottom: number) => ({
+      x: left,
+      y: top,
+      left,
+      top,
+      right,
+      bottom,
+      width: right - left,
+      height: bottom - top,
+      toJSON: () => ({}),
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this instanceof HTMLElement && this.id === "main-content") {
+        return rectFor(0, 0, 1400, 800);
+      }
+      if (
+        this instanceof HTMLElement
+        && this.getAttribute("data-testid") === "document-annotation-body-plan"
+      ) {
+        return rectFor(80, 120, 640, 620);
+      }
+      return originalGetBoundingClientRect.call(this);
+    });
+
+    const root = createRoot(container);
+    const queryClient = makeQueryClient();
+    const doc = makeDoc();
+
+    try {
+      await act(async () => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <main id="main-content">
+              <Harness doc={doc} initialPanelOpen />
+            </main>
+          </QueryClientProvider>,
+        );
+      });
+      await flush();
+      await flush();
+
+      const anchor = container.querySelector('[data-testid="document-annotation-panel-anchor"]') as HTMLElement | null;
+      expect(anchor).not.toBeNull();
+      // The document body ends at 640; the panel should clear it with a margin
+      // rather than sitting flush against the document's right edge.
+      expect(parseFloat(anchor!.style.left)).toBeGreaterThan(640);
+      expect(anchor!.style.left).toBe("664px");
+    } finally {
+      rectSpy.mockRestore();
+    }
+  });
+
   it("auto-opens the panel and focuses the thread when deep-linked", async () => {
     mockAnnotationsApi.list.mockResolvedValue([makeThread({ id: "thread-99" })]);
     const root = createRoot(container);
