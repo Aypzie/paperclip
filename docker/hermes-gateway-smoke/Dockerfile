@@ -22,7 +22,7 @@ RUN apt-get update \
 # the matching Python package globally first so the non-root runtime user can
 # import the upstream Hermes modules at container start.
 RUN python3 -m pip install --break-system-packages --no-cache-dir "hermes-agent==${HERMES_VERSION}" \
-  && rm -f /usr/local/bin/hermes \
+  && rm -f /usr/local/bin/hermes /usr/local/bin/hermes-agent \
   && npm install -g --ignore-scripts "hermes-agent@${HERMES_VERSION}" \
   && python3 -c "import hermes_cli.main" \
   && command -v hermes >/dev/null
