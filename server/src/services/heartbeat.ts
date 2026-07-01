@@ -517,6 +517,7 @@ export async function resolveExecutionRunAdapterConfig(input: {
   adapterType?: string | null;
   issueId?: string | null;
   heartbeatRunId?: string | null;
+  responsibleUserId?: string | null;
   environmentId?: string | null;
   environmentEnv?: unknown;
   projectId?: string | null;
@@ -676,6 +677,7 @@ export async function resolveExecutionRunAdapterConfig(input: {
               consumerId: input.environmentId,
               actorType: "agent",
               actorId: input.agentId ?? null,
+              responsibleUserId: input.responsibleUserId ?? null,
               issueId: input.issueId ?? null,
               heartbeatRunId: input.heartbeatRunId ?? null,
               ...(lowTrustAllowedBindingIds !== undefined ? { allowedBindingIds: lowTrustAllowedBindingIds } : {}),
@@ -692,6 +694,7 @@ export async function resolveExecutionRunAdapterConfig(input: {
           consumerId: input.agentId,
           actorType: "agent",
           actorId: input.agentId,
+          responsibleUserId: input.responsibleUserId ?? null,
           issueId: input.issueId ?? null,
           heartbeatRunId: input.heartbeatRunId ?? null,
           ...(lowTrustAllowedBindingIds !== undefined ? { allowedBindingIds: lowTrustAllowedBindingIds } : {}),
@@ -718,6 +721,7 @@ export async function resolveExecutionRunAdapterConfig(input: {
               consumerId: input.projectId,
               actorType: "agent",
               actorId: input.agentId ?? null,
+              responsibleUserId: input.responsibleUserId ?? null,
               issueId: input.issueId ?? null,
               heartbeatRunId: input.heartbeatRunId ?? null,
               ...(lowTrustAllowedBindingIds !== undefined ? { allowedBindingIds: lowTrustAllowedBindingIds } : {}),
@@ -744,6 +748,7 @@ export async function resolveExecutionRunAdapterConfig(input: {
               consumerId: input.routineId,
               actorType: "agent",
               actorId: input.agentId ?? null,
+              responsibleUserId: input.responsibleUserId ?? null,
               issueId: input.issueId ?? null,
               heartbeatRunId: input.heartbeatRunId ?? null,
               ...(lowTrustAllowedBindingIds !== undefined ? { allowedBindingIds: lowTrustAllowedBindingIds } : {}),
