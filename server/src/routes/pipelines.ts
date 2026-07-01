@@ -1056,6 +1056,7 @@ export function pipelineRoutes(db: Db, options: Parameters<typeof pipelineServic
         currentStageKey: pipelineStages.key,
         currentStageName: pipelineStages.name,
         automationId: pipelineAutomationExecutions.automationId,
+        routineId: pipelineAutomationExecutions.routineId,
         status: pipelineAutomationExecutions.status,
         error: pipelineAutomationExecutions.error,
         updatedAt: pipelineAutomationExecutions.updatedAt,
@@ -1089,6 +1090,7 @@ export function pipelineRoutes(db: Db, options: Parameters<typeof pipelineServic
             env: routines.env,
             latestRevisionId: routines.latestRevisionId,
             latestRevisionNumber: routines.latestRevisionNumber,
+            updatedAt: routines.updatedAt,
           })
           .from(routines)
           .where(and(eq(routines.companyId, companyId), inArray(routines.id, automationRoutineIds)))
@@ -1102,8 +1104,10 @@ export function pipelineRoutes(db: Db, options: Parameters<typeof pipelineServic
         env: row.env,
         latestRevisionId: row.latestRevisionId,
         latestRevisionNumber: row.latestRevisionNumber,
+        updatedAt: row.updatedAt,
       },
     ]));
+    const routineUpdatedAtById = new Map(routineRows.map((row) => [row.id, row.updatedAt]));
 
     const bodyByStageId = new Map<string, string>();
     for (const doc of instructionDocs) {
@@ -1143,6 +1147,11 @@ export function pipelineRoutes(db: Db, options: Parameters<typeof pipelineServic
       };
     });
     const stageById = new Map(stages.map((stage) => [stage.id, stage]));
+    const stageByAutomationId = new Map<string, typeof stages[number]>();
+    for (const stage of stages) {
+      const automationId = stageAutomationId(stage);
+      if (automationId) stageByAutomationId.set(automationId, stage);
+    }
     const latestExecutionByCaseAutomation = new Map<string, typeof automationExecutionRows[number]>();
     for (const row of automationExecutionRows) {
       const key = `${row.caseId}:${row.automationId}`;
@@ -1152,10 +1161,20 @@ export function pipelineRoutes(db: Db, options: Parameters<typeof pipelineServic
       }
     }
     const failedAutomations: PipelineHealthFailedAutomationInput[] = [...latestExecutionByCaseAutomation.values()]
-      .filter((row) => row.status === "failed")
+      .filter((row) => {
+        if (row.status !== "failed") return false;
+        const automationStage = stageByAutomationId.get(row.automationId);
+        if (!automationStage) return false;
+        const routineUpdatedAt = routineUpdatedAtById.get(row.routineId);
+        const configurationUpdatedAt = Math.max(
+          automationStage.updatedAt.getTime(),
+          routineUpdatedAt?.getTime() ?? 0,
+        );
+        return row.updatedAt.getTime() >= configurationUpdatedAt;
+      })
       .map((row) => {
         const automationStageId = row.automationId.split(":")[0] ?? "";
-        const automationStage = stageById.get(automationStageId);
+        const automationStage = stageByAutomationId.get(row.automationId) ?? stageById.get(automationStageId);
         return {
           stageId: automationStage?.id ?? row.currentStageId,
           stageKey: automationStage?.key ?? row.currentStageKey,

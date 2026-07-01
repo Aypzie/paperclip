@@ -175,11 +175,14 @@ describeEmbeddedPostgres("pipeline routes", () => {
     const company = await seedCompany();
     const agent = await seedAutomationAgent(company.id);
     const http = request(app(boardActor));
+    const stageConfiguredAt = new Date("2026-06-30T17:00:00.000Z");
     const [routine] = await db.insert(routines).values({
       companyId: company.id,
       title: "Assembly automation",
       description: "Assemble the item.",
       assigneeAgentId: agent.id,
+      createdAt: stageConfiguredAt,
+      updatedAt: stageConfiguredAt,
     }).returning();
 
     const [pipeline] = await db.insert(pipelines).values({
@@ -197,6 +200,8 @@ describeEmbeddedPostgres("pipeline routes", () => {
         kind: "working",
         position: 100,
         config: { onEnter: { type: "run_routine", routineId: routine!.id } },
+        createdAt: stageConfiguredAt,
+        updatedAt: stageConfiguredAt,
       },
       {
         pipelineId,
@@ -204,6 +209,8 @@ describeEmbeddedPostgres("pipeline routes", () => {
         name: "Content Review",
         kind: "review",
         position: 200,
+        createdAt: stageConfiguredAt,
+        updatedAt: stageConfiguredAt,
       },
     ]).returning();
     const automationId = `${assemblyStage.id}:on_enter`;
@@ -281,6 +288,93 @@ describeEmbeddedPostgres("pipeline routes", () => {
         href: `/pipelines/${pipelineId}/items/${unresolvedCase!.id}`,
       }),
     ]);
+  });
+
+  it("clears stale automation failures after the automation setup is edited", async () => {
+    const company = await seedCompany();
+    const agent = await seedAutomationAgent(company.id);
+    const http = request(app(boardActor));
+    const stageConfiguredAt = new Date("2026-06-30T17:00:00.000Z");
+    const [routine] = await db.insert(routines).values({
+      companyId: company.id,
+      title: "Draft automation",
+      description: "Draft the item.",
+      assigneeAgentId: agent.id,
+      createdAt: stageConfiguredAt,
+      updatedAt: stageConfiguredAt,
+    }).returning();
+
+    const [pipeline] = await db.insert(pipelines).values({
+      companyId: company.id,
+      key: "content",
+      name: "Content",
+      createdByUserId: "board-user",
+    }).returning();
+    const pipelineId = pipeline!.id;
+    const [draftStage, reviewStage] = await db.insert(pipelineStages).values([
+      {
+        pipelineId,
+        key: "draft",
+        name: "Draft",
+        kind: "working",
+        position: 100,
+        config: { onEnter: { type: "run_routine", routineId: routine!.id } },
+        createdAt: stageConfiguredAt,
+        updatedAt: stageConfiguredAt,
+      },
+      {
+        pipelineId,
+        key: "review",
+        name: "Review",
+        kind: "review",
+        position: 200,
+        createdAt: stageConfiguredAt,
+        updatedAt: stageConfiguredAt,
+      },
+    ]).returning();
+    const automationId = `${draftStage!.id}:on_enter`;
+    const [pipelineCase] = await db.insert(pipelineCases).values({
+      companyId: company.id,
+      pipelineId,
+      stageId: reviewStage!.id,
+      caseKey: "fixed-config",
+      title: "Config was fixed",
+    }).returning();
+
+    await db.insert(pipelineAutomationExecutions).values({
+      companyId: company.id,
+      caseId: pipelineCase!.id,
+      automationId,
+      triggeringEventId: randomUUID(),
+      routineId: routine!.id,
+      status: "failed",
+      error: "automation_not_configured",
+      createdAt: new Date("2026-06-30T18:00:00.000Z"),
+      updatedAt: new Date("2026-06-30T18:00:00.000Z"),
+    });
+
+    await http.get(`/api/pipelines/${pipelineId}/health`)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.warnings).toEqual([
+          expect.objectContaining({
+            code: "automation_failed",
+            stageId: draftStage!.id,
+            href: `/pipelines/${pipelineId}/items/${pipelineCase!.id}`,
+          }),
+        ]);
+      });
+
+    await db.update(pipelineStages)
+      .set({
+        config: { onEnter: { type: "run_routine", routineId: routine!.id } },
+        updatedAt: new Date("2026-06-30T19:00:00.000Z"),
+      })
+      .where(eq(pipelineStages.id, draftStage!.id));
+
+    const health = await http.get(`/api/pipelines/${pipelineId}/health`).expect(200);
+
+    expect(health.body.warnings.filter((warning: { code: string }) => warning.code === "automation_failed")).toEqual([]);
   });
 
   it("exposes the pipeline and case route surface", async () => {
